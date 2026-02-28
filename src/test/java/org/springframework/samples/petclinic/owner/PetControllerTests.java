@@ -16,6 +16,7 @@
 
 package org.springframework.samples.petclinic.owner;
 
+import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -242,6 +244,44 @@ class PetControllerTests {
 				.andExpect(view().name("pets/createOrUpdatePetForm"));
 		}
 
+		@Test
+		void testProcessUpdateFormWithDuplicateName() throws Exception {
+			// Edit dog (id=2) and rename it to "petty" which collides with pet (id=1)
+			mockMvc
+				.perform(post("/owners/{ownerId}/pets/{petId}/edit", TEST_OWNER_ID, TEST_PET_ID + 1)
+					.param("name", "petty")
+					.param("type", "hamster")
+					.param("birthDate", "2015-02-12"))
+				.andExpect(model().attributeHasErrors("pet"))
+				.andExpect(model().attributeHasFieldErrors("pet", "name"))
+				.andExpect(model().attributeHasFieldErrorCode("pet", "name", "duplicate"))
+				.andExpect(status().isOk())
+				.andExpect(view().name("pets/createOrUpdatePetForm"));
+		}
+
+	}
+
+	@Test
+	void testFindOwnerNotFound() {
+		int nonExistentOwnerId = 999;
+		given(this.owners.findById(nonExistentOwnerId)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> mockMvc.perform(get("/owners/{ownerId}/pets/new", nonExistentOwnerId)))
+			.isInstanceOf(ServletException.class)
+			.hasCauseInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("Owner not found with id: " + nonExistentOwnerId);
+	}
+
+	@Test
+	void testFindPetOwnerNotFound() {
+		int nonExistentOwnerId = 999;
+		given(this.owners.findById(nonExistentOwnerId)).willReturn(Optional.empty());
+
+		assertThatThrownBy(
+				() -> mockMvc.perform(get("/owners/{ownerId}/pets/{petId}/edit", nonExistentOwnerId, TEST_PET_ID)))
+			.isInstanceOf(ServletException.class)
+			.hasCauseInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("Owner not found with id: " + nonExistentOwnerId);
 	}
 
 }
