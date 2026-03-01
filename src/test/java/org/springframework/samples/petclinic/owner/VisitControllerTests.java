@@ -23,9 +23,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import jakarta.servlet.ServletException;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledInNativeImage;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.aot.DisabledInAotMode;
@@ -89,6 +94,24 @@ class VisitControllerTests {
 			.andExpect(model().attributeHasErrors("visit"))
 			.andExpect(status().isOk())
 			.andExpect(view().name("pets/createOrUpdateVisitForm"));
+	}
+
+	@Test
+	void testInitNewVisitFormOwnerNotFound() throws Exception {
+		ServletException ex = assertThrows(ServletException.class,
+				() -> mockMvc.perform(get("/owners/{ownerId}/pets/{petId}/visits/new", 999, TEST_PET_ID)));
+		assertThat(ex.getCause()).isInstanceOf(IllegalArgumentException.class);
+		assertThat(ex.getCause().getMessage()).contains("Owner not found with id: 999");
+	}
+
+	@Test
+	void testProcessNewVisitFormOwnerNotFound() throws Exception {
+		ServletException ex = assertThrows(ServletException.class,
+				() -> mockMvc
+					.perform(post("/owners/{ownerId}/pets/{petId}/visits/new", 999, TEST_PET_ID).param("name", "George")
+						.param("description", "Visit Description")));
+		assertThat(ex.getCause()).isInstanceOf(IllegalArgumentException.class);
+		assertThat(ex.getCause().getMessage()).contains("Owner not found with id: 999");
 	}
 
 }
